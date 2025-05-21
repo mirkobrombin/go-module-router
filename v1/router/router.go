@@ -31,6 +31,8 @@ func New(reg *registry.Registry, services map[string]any, eng httpdrv.Engine, op
 	}
 
 	repoInstances := map[string]any{}
+	maps.Copy(repoInstances, services)
+
 	if !opt.SkipAutoWire {
 		for name, fn := range reg.RepoInit {
 			repoInstances[name] = fn(repoInstances)
