@@ -50,8 +50,11 @@ import (
 )
 
 func main() {
-	zl, _ := zap.NewProduction()
+    zapL, _ := zap.NewDevelopment()
+	defer zapL.Sync()
+
 	eng := http.NewFastHTTP()
+	lg := &logger.Zap{L: zapL}
 
 	router.New(
 		registry.Global(), // collected during imports
@@ -59,11 +62,13 @@ func main() {
 		eng,               // chosen HTTP engine
 		router.Options{
 			SessionDuration: 24 * time.Hour,
-			Logger:          &logger.Zap{L: zl},
+			Logger:          lg,
 		},
 	)
 
-	zl.Fatal("server stopped", zap.Error(eng.Serve(":8080")))
+	if err := eng.Serve(":8080"); err != nil {
+		lg.Fatal("server terminated", "err", err)
+	}
 }
 ```
 
