@@ -74,7 +74,7 @@ only in a specific build, you can use a build tag to conditionally include
 it.
 
 Of course, this is not a feature of this library, but a Go feature, so enjoy
-the full power of Go's build system.
+the full power of the Go's build system.
 
 ```go
 //go:build !payments
