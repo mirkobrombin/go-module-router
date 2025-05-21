@@ -93,16 +93,16 @@ func New(reg *registry.Registry, services map[string]any, eng httpdrv.Engine, op
 			continue
 		}
 
-		fh := h
+		var fh httpdrv.Handler = h
 		for i := len(rt.Middleware) - 1; i >= 0; i-- {
 			raw := mwInstances[rt.Middleware[i]]
-			mw, ok := raw.(middleware.Component)
+			mwComp, ok := raw.(middleware.Component)
 			if !ok {
 				opt.Logger.Error("router: middleware does not implement Component",
 					zap.String("name", rt.Middleware[i]))
 				continue
 			}
-			fh = mw.Apply(fh, middleware.RouteInfo{Permissions: rt.Permissions})
+			fh = mwComp.Apply(fh, middleware.RouteInfo{Permissions: rt.Permissions})
 		}
 
 		eng.Handle(rt.Method, rt.Path, fh)

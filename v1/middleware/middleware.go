@@ -1,11 +1,11 @@
 package middleware
 
-import "github.com/valyala/fasthttp"
+import "github.com/mirkobrombin/go-module-router/v1/http"
 
 type RouteInfo struct {
 	Permissions []string
 }
 
 type Component interface {
-	Apply(next fasthttp.RequestHandler, info RouteInfo) fasthttp.RequestHandler
+	Apply(next http.Handler, info RouteInfo) http.Handler
 }
