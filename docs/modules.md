@@ -39,6 +39,28 @@ func init() {
 * **HandlerName** in a route is the fully-qualified form
   `"<HandlerStruct>.<Method>"`.
 
+### Accessing Registered Modules
+
+One of the powerful features of this router is the ability to access registered
+modules from other parts of your code. Since dependencies are injected as maps,
+you can easily retrieve and type-assert the modules you need.
+
+For example, if you have a `Config` module registered as a repository, you can
+access it in your service factory:
+
+```go
+registry.RegisterService("MyService", func(repos map[string]any) any {
+    cfg := repos["Config"].(*config.Config)
+    
+    return &MyService{
+        Config: cfg,
+    }
+})
+```
+
+This allows for a highly decoupled yet interconnected system where modules can
+share state and functionality without tight coupling.
+
 ### Import side-effects
 
 Simply importing the package is enough to make its pieces available:

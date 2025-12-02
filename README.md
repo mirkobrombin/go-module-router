@@ -1,7 +1,11 @@
 # Go Module Router
 
-A lightweight, zero-codegen library that lets you compose **modular HTTP
-applications** in Go.
+A lightweight, zero-codegen library that lets you compose **modular projects**
+in Go.
+
+It is not just a web router; it is a **modular project router** that *includes*
+a web router. You can use it to structure CLI tools, background workers, or any
+modular Go application.
 
 Define repositories, services, middleware and routes in plain Go code and
 have them autowired at start-up—no reflection on the hot path, no generated
