@@ -1,6 +1,6 @@
 package middleware
 
-import "github.com/mirkobrombin/go-module-router/v1/http"
+import "github.com/mirkobrombin/go-module-router/v2/pkg/http"
 
 type RouteInfo struct {
 	Permissions []string

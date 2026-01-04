@@ -1,7 +1,8 @@
 # Logging
 
-The router never imports a concrete logging library.  
-Instead it depends on this tiny interface:
+All transports support a common logger interface.
+
+## Logger Interface
 
 ```go
 type Logger interface {
@@ -13,22 +14,47 @@ type Logger interface {
 }
 ```
 
-this allows you to plug in any logger you like.
+## Setting the Logger
 
-### Included implementations
-
-* `logger.Zap` – wraps a `*zap.Logger`.
-* `logger.Nop` – silent no-op logger (default).
-
-### Plugging your own logger
+### Via Router Facade
 
 ```go
-type slogAdapter struct{ h *slog.Logger }
-
-func (s slogAdapter) Debug(m string, kv ...any) { s.h.Debug(m, kv...) }
-
-router.New(registry.Global(), nil, eng, router.Options{
-    Logger: slogAdapter{h: slog.New(...)} ,
-})
+r := router.New()
+r.SetLogger(logger.NewSlog(slog.Default()))
 ```
 
+### Via Transport
+
+```go
+t := http.New()
+t.Logger = logger.NewSlog(slog.Default())
+```
+
+## Available Implementations
+
+### Nop Logger (Default)
+
+Silent, no output.
+
+```go
+t.Logger = logger.Nop
+```
+
+### Slog Logger
+
+```go
+import "github.com/mirkobrombin/go-module-router/v2/pkg/logger"
+
+t.Logger = logger.NewSlog(slog.Default())
+```
+
+### Zap Logger
+
+```go
+zapL, _ := zap.NewDevelopment()
+t.Logger = &logger.Zap{L: zapL}
+```
+
+## Custom Logger
+
+Implement the `Logger` interface for your own logging solution.

@@ -3,8 +3,7 @@ package registry
 import "sync"
 
 var (
-	global     = New()
-	onceGlobal sync.Once
+	global = New()
 )
 
 func Global() *Registry { return global }
@@ -33,26 +32,31 @@ func RegisterService(name string, fn ServiceInit) {
 	defer global.mu.Unlock()
 	global.ServiceInit[name] = fn
 }
+
 func RegisterRepository(name string, fn RepoInit) {
 	global.mu.Lock()
 	defer global.mu.Unlock()
 	global.RepoInit[name] = fn
 }
+
 func RegisterHandler(name string, fn HandlerInit) {
 	global.mu.Lock()
 	defer global.mu.Unlock()
 	global.HandlerInit[name] = fn
 }
+
 func RegisterMiddleware(name string, fn MiddlewareInit) {
 	global.mu.Lock()
 	defer global.mu.Unlock()
 	global.MiddlewareInit[name] = fn
 }
+
 func RegisterModels(fn ModelProvider) {
 	global.mu.Lock()
 	defer global.mu.Unlock()
 	global.ModelProviders = append(global.ModelProviders, fn)
 }
+
 func RegisterRoutes(fn RouteProvider) {
 	global.mu.Lock()
 	defer global.mu.Unlock()

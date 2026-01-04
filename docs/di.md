@@ -1,29 +1,57 @@
-# Dependency Injection (Zero Code-Gen)
+# Dependency Injection
 
-DI in `go-module-router` is **factory-based**:
+All transports share the same DI mechanism via `core.Container`.
 
+## Providing Dependencies
+
+```go
+// Via transport
+t := http.New()
+t.Provide("DB", db)
+t.Provide("UserService", userService)
+
+// Or via router facade
+r := router.New()
+r.Provide("DB", db)  // Registers in all transports
 ```
-┌──────────┐                ┌────────────┐
-│ Factory  │ ----requires→  │   Deps     │
-└──────────┘                └────────────┘
 
+## Injecting into Handlers
+
+Dependencies are injected by matching field names:
+
+```go
+type GetUser struct {
+    Meta core.Pattern `method:"GET" path:"/users/{id}"`
+
+    // Injected by field name "DB"
+    DB *sql.DB
+
+    // Injected by field name "UserService"
+    UserService UserService
+}
 ```
 
-*   **Repositories** receive a map of _already built_ repositories.
-*   **Services** receive a map of repositories (and may build on each other).
-*   **Handlers / Middleware** receive a map of services.
+The container matches `Provide("DB", ...)` to fields named `DB`.
 
-Because everything is ordinary Go code you can:
+## Type Safety
 
-*   Initialise third-party clients inside a factory.
-*   Return an interface instead of a concrete struct.
-*   Decide at runtime to _skip_ auto-wiring by returning `nil` and injecting
-    your own instance later.
+Injection is type-checked at runtime. If the provided value cannot be assigned to the field type, it will be skipped.
 
-### Circular dependencies
+## Direct Container Usage
 
-Factories run **in registration order**.  
-Avoid circular service graphs—or break the cycle by injecting an already built
-instance in `services map[string]any` when you call `router.New`.
+For advanced use cases:
 
+```go
+import "github.com/mirkobrombin/go-module-router/v2/pkg/core"
 
+container := core.NewContainer()
+container.Provide("Config", config)
+
+// Inject into any struct
+container.Inject(&myHandler)
+
+// Retrieve a dependency
+if dep, ok := container.Get("Config"); ok {
+    cfg := dep.(*Config)
+}
+```

@@ -1,99 +1,106 @@
 # Go Module Router
 
-A lightweight, zero-codegen library that lets you compose **modular projects**
-in Go.
+A **declarative**, transport-agnostic module router for Go.
 
-It is not just a web router; it is a **modular project router** that *includes*
-a web router. You can use it to structure CLI tools, background workers, or any
-modular Go application.
-
-Define repositories, services, middleware and routes in plain Go code and
-have them autowired at start-up—no reflection on the hot path, no generated
-files to commit.
+Define handlers as structs with tags. The router handles binding, dependency injection, and dispatching. Works for web backends, GUI apps, CLI tools, and more.
 
 ## Features
 
-* **Module Auto-Discovery:** Register repositories, services, handlers,
-  middleware, models and routes via `init()` functions—imports are enough.
-* **Dependency Injection (No Codegen):** Factory functions receive their
-  dependencies by name at runtime; use `SkipAutoWire` when you prefer to build
-  instances yourself.
-* **Multiple HTTP Engines:** Ship with fasthttp and net/http adapters—drop in
-  your own by implementing a tiny `http.Engine` interface.
-* **Pluggable Logging:** Bring any logger that satisfies a five-method
-  interface; a Zap implementation (and a nop) are already included.
-* **Route Introspection:** Build the route table without starting a server—
-  handy for tests, docs, or static analysis tooling.
-* **Zero Magic:** No struct tags, no global singletons, no hidden goroutines—
-  just idiomatic Go.
+- **Declarative Handlers:** Define handlers using struct tags.
+- **Transport Agnostic:** Use the same pattern for HTTP, GUI actions, CLI commands.
+- **Auto-Binding:** Parameters are automatically bound to struct fields.
+- **Dependency Injection:** Services are injected by field name.
+- **Middleware Support:** Standard middleware for HTTP transport.
 
-## Getting Started
-
-### Installation
+## Installation
 
 ```bash
-go get github.com/mirkobrombin/go-module-router/v1
+go get github.com/mirkobrombin/go-module-router/v2
 ```
 
-### Basic Usage
+## Transports
+
+### HTTP Transport
+
+For web backends and APIs.
 
 ```go
 package main
 
 import (
-	"time"
+    "context"
+    "log/slog"
 
-	"github.com/mirkobrombin/go-module-router/v1/http"
-	"github.com/mirkobrombin/go-module-router/v1/logger"
-	"github.com/mirkobrombin/go-module-router/v1/registry"
-	"github.com/mirkobrombin/go-module-router/v1/router"
-
-	_ "example.com/project/core/modules/ping" // ⚙ self-registering module
-
-	"go.uber.org/zap"
+    "github.com/mirkobrombin/go-module-router/v2/pkg/core"
+    "github.com/mirkobrombin/go-module-router/v2/pkg/logger"
+    "github.com/mirkobrombin/go-module-router/v2/pkg/router"
 )
 
+type GetUser struct {
+    Meta core.Pattern `method:"GET" path:"/users/{id}"`
+    ID   string       `path:"id"`
+    DB   *sql.DB
+}
+
+func (e *GetUser) Handle(ctx context.Context) (any, error) {
+    return User{ID: e.ID}, nil
+}
+
 func main() {
-    zapL, _ := zap.NewDevelopment()
-	defer zapL.Sync()
-
-	eng := http.NewFastHTTP()
-	lg := &logger.Zap{L: zapL}
-
-	router.New(
-		registry.Global(), // collected during imports
-		nil,               // extra services you built manually
-		eng,               // chosen HTTP engine
-		router.Options{
-			SessionDuration: 24 * time.Hour,
-			Logger:          lg,
-		},
-	)
-
-	if err := eng.Serve(":8080"); err != nil {
-		lg.Fatal("server terminated", "err", err)
-	}
+    r := router.New()
+    r.SetLogger(logger.NewSlog(slog.Default()))
+    r.Provide("DB", db)
+    r.Register(&GetUser{})
+    r.Listen(":8080")
 }
 ```
 
-> **Note:** Importing the package `.../modules/ping` is all that’s required; its
-> `init()` registers a service, handler and route which the router wires up
-> automatically.
+### Action Transport
 
-For more detailed information, please refer to the documentation files in the
-[docs/](docs/) directory.
+For GUI apps, TUI editors, or any event-driven application.
+
+```go
+package main
+
+import (
+    "context"
+
+    "github.com/mirkobrombin/go-module-router/v2/pkg/core"
+    "github.com/mirkobrombin/go-module-router/v2/pkg/transport/action"
+)
+
+type SaveAction struct {
+    Meta     core.Pattern `action:"file.save" keys:"ctrl+s"`
+    Document *Document
+}
+
+func (a *SaveAction) Handle(ctx context.Context) (any, error) {
+    return a.Document.Save()
+}
+
+func main() {
+    t := action.New()
+    t.Provide("Document", doc)
+    t.Register(&SaveAction{})
+
+    // Dispatch by keybinding
+    t.DispatchKey(ctx, "ctrl+s")
+
+    // Or by action name
+    t.Dispatch(ctx, "file.save")
+}
+```
 
 ## Documentation
 
-* [Module Discovery](docs/modules.md)
-* [Dependency Injection](docs/di.md)
-* [HTTP Engines](docs/engines.md)
-* [Logging](docs/logging.md)
-* [Router Options](docs/options.md)
-* [Route Introspection](docs/introspection.md)
-* [Route Metadata](docs/router_metadata.md)
+- [Core Concepts](docs/core.md)
+- [HTTP Transport](docs/http.md)
+- [Action Transport](docs/action.md)
+- [Dependency Injection](docs/di.md)
+- [Middleware](docs/middleware.md)
+- [OpenAPI Generation](docs/openapi.md)
+- [Logging](docs/logging.md)
 
 ## License
 
-Go Module Router is released under the MIT license.
-See the [LICENSE](LICENSE) file for the full text.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
