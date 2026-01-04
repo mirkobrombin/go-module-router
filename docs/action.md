@@ -67,6 +67,31 @@ actions := t.Actions()  // ["file.save", "file.open", ...]
 bindings := t.KeyBindings()  // {"ctrl+s": "file.save", ...}
 ```
 
+## Event Bus Integration
+
+The Action transport integrates with `go-signal` to provide an asynchronous notification system. 
+
+By default, the transport uses the **`bus.Default()`** instance. Every dispatched action automatically emits its instance as an event on this bus after execution. 
+
+```go
+import "github.com/mirkobrombin/go-signal/v2/pkg/bus"
+
+// Subscribe to any instance of SaveAction using the default bus
+bus.Subscribe(nil, func(ctx context.Context, e *SaveAction) error {
+    fmt.Println("File saved successfully!")
+    return nil
+})
+```
+
+If you need a custom bus instance, you can provide it during initialization:
+
+```go
+customBus := bus.New(bus.WithStrategy(bus.BestEffort))
+t := action.New(action.WithBus(customBus))
+```
+
+For more advanced architecture patterns using this combo, see [Integration with other libraries](ecosystem.md).
+
 ## Use Cases
 
 - **Text Editors:** Save, Open, Find, Replace commands

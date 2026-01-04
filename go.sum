@@ -6,6 +6,10 @@ github.com/fasthttp/router v1.5.4 h1:oxdThbBwQgsDIYZ3wR1IavsNl6ZS9WdjKukeMikOnC8
 github.com/fasthttp/router v1.5.4/go.mod h1:3/hysWq6cky7dTfzaaEPZGdptwjwx0qzTgFCKEWRjgc=
 github.com/klauspost/compress v1.18.1 h1:bcSGx7UbpBqMChDtsF28Lw6v/G94LPrrbMbdC3JH2co=
 github.com/klauspost/compress v1.18.1/go.mod h1:ZQFFVG+MdnR0P+l6wpXgIL4NTtwiKIdBnrBd8Nrxr+0=
+github.com/mirkobrombin/go-revert/v2 v2.0.0 h1:TDRadl8UOBzQMsSNrS2hi6fFYTK9Vfxv7GBmUfq+lvw=
+github.com/mirkobrombin/go-revert/v2 v2.0.0/go.mod h1:7RA0Vrab96yuw2MScNMs3LQmSTkMetOcIKVCvncAXZU=
+github.com/mirkobrombin/go-signal/v2 v2.0.0 h1:8XHnop9mdysg+Mlk1KYKkbIhDk3I6TQHh7dJh8aJo9E=
+github.com/mirkobrombin/go-signal/v2 v2.0.0/go.mod h1:Csmo2dYGH8or5nVVq4TMydv/LGXuv+Wg0Ryj5XsNWlg=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 h1:D0vL7YNisV2yqE55+q0lFuGse6U8lxlg7fYTctlT5Gc=

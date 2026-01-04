@@ -97,6 +97,7 @@ func main() {
 - [HTTP Transport](docs/http.md)
 - [Action Transport](docs/action.md)
 - [Dependency Injection](docs/di.md)
+- [Integration with my other libraries](docs/ecosystem.md)
 - [Middleware](docs/middleware.md)
 - [OpenAPI Generation](docs/openapi.md)
 - [Logging](docs/logging.md)

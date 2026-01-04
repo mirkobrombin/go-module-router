@@ -7,6 +7,7 @@ import (
 	"github.com/mirkobrombin/go-module-router/v2/pkg/logger"
 	"github.com/mirkobrombin/go-module-router/v2/pkg/transport/action"
 	"github.com/mirkobrombin/go-module-router/v2/pkg/transport/http"
+	"github.com/mirkobrombin/go-signal/v2/pkg/bus"
 )
 
 // Re-export core types for convenience
@@ -49,6 +50,11 @@ func (r *Router) SetLogger(l logger.Logger) {
 	r.Action.Logger = l
 }
 
+// SetBus sets the event bus for action-based dispatching.
+func (r *Router) SetBus(b *bus.Bus) {
+	r.Action.Bus = b
+}
+
 // Provide registers a dependency in all transports.
 func (r *Router) Provide(name string, instance any) {
 	r.HTTP.Provide(name, instance)
@@ -73,9 +79,9 @@ func (r *Router) Listen(addr string) error {
 	return r.HTTP.Listen(addr)
 }
 
-// Dispatch dispatches an action.
-func (r *Router) Dispatch(ctx context.Context, action string) (any, error) {
-	return r.Action.Dispatch(ctx, action)
+// Dispatch dispatches an action with an optional payload.
+func (r *Router) Dispatch(ctx context.Context, action string, payload ...any) (any, error) {
+	return r.Action.Dispatch(ctx, action, payload...)
 }
 
 // DispatchKey dispatches an action by keybinding.

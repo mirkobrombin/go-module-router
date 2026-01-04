@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/mirkobrombin/go-module-router/v2/pkg/core"
 	"github.com/mirkobrombin/go-module-router/v2/pkg/logger"
+	"github.com/mirkobrombin/go-signal/v2/pkg/bus"
 )
 
 // Transport handles action-based routing for GUI/CLI applications.
@@ -16,17 +18,29 @@ type Transport struct {
 	Logger    logger.Logger
 	handlers  map[string]core.Handler
 	keys      map[string]string // keybinding -> action
+	Bus       *bus.Bus
 	mu        sync.RWMutex
 }
 
+type Option func(*Transport)
+
+func WithBus(b *bus.Bus) Option {
+	return func(t *Transport) { t.Bus = b }
+}
+
 // New creates a new action transport.
-func New() *Transport {
-	return &Transport{
+func New(opts ...Option) *Transport {
+	t := &Transport{
 		container: core.NewContainer(),
 		Logger:    logger.Nop,
 		handlers:  make(map[string]core.Handler),
 		keys:      make(map[string]string),
+		Bus:       bus.Default(),
 	}
+	for _, opt := range opts {
+		opt(t)
+	}
+	return t
 }
 
 // Provide registers a dependency.
@@ -69,10 +83,11 @@ func (t *Transport) Register(prototype core.Handler) {
 	t.Logger.Info("Registered action", "action", actionName, "keys", keyBinding)
 }
 
-// Dispatch executes an action by name.
-func (t *Transport) Dispatch(ctx context.Context, action string) (any, error) {
+// Dispatch executes an action by name with an optional payload.
+func (t *Transport) Dispatch(ctx context.Context, action string, payload ...any) (any, error) {
 	t.mu.RLock()
 	prototype, ok := t.handlers[action]
+	busInstance := t.Bus
 	t.mu.RUnlock()
 
 	if !ok {
@@ -89,9 +104,76 @@ func (t *Transport) Dispatch(ctx context.Context, action string) (any, error) {
 	instance := newVal.Addr().Interface()
 	t.container.Inject(instance)
 
+	// Real payload binding
+	if len(payload) > 0 && payload[0] != nil {
+		if err := t.applyPayload(instance, payload[0]); err != nil {
+			return nil, fmt.Errorf("payload binding failed: %w", err)
+		}
+	}
+
 	// Execute
 	handler := instance.(core.Handler)
-	return handler.Handle(ctx)
+	res, err := handler.Handle(ctx)
+
+	// If a bus is present, emit the action as an event asynchronously
+	if busInstance != nil {
+		bus.EmitAsync(ctx, busInstance, instance)
+	}
+
+	return res, err
+}
+
+// applyPayload maps data from the payload to the target struct.
+// It supports map[string]any and structs, using reflection and "json" tags.
+func (t *Transport) applyPayload(target any, payload any) error {
+	dstVal := reflect.ValueOf(target).Elem()
+	dstType := dstVal.Type()
+
+	srcVal := reflect.ValueOf(payload)
+	if srcVal.Kind() == reflect.Ptr {
+		srcVal = srcVal.Elem()
+	}
+
+	switch srcVal.Kind() {
+	case reflect.Map:
+		for _, key := range srcVal.MapKeys() {
+			k := fmt.Sprintf("%v", key.Interface())
+			v := srcVal.MapIndex(key)
+			t.setFieldByNameOrTag(dstVal, dstType, k, v)
+		}
+	case reflect.Struct:
+		srcType := srcVal.Type()
+		for i := 0; i < srcVal.NumField(); i++ {
+			field := srcType.Field(i)
+			val := srcVal.Field(i)
+			t.setFieldByNameOrTag(dstVal, dstType, field.Name, val)
+		}
+	}
+
+	return nil
+}
+
+func (t *Transport) setFieldByNameOrTag(dst reflect.Value, dstType reflect.Type, name string, val reflect.Value) {
+	for i := 0; i < dst.NumField(); i++ {
+		fieldMeta := dstType.Field(i)
+		field := dst.Field(i)
+
+		if !field.CanSet() {
+			continue
+		}
+
+		// Match by name or json tag
+		tag := fieldMeta.Tag.Get("json")
+		if strings.EqualFold(fieldMeta.Name, name) || (tag != "" && strings.Split(tag, ",")[0] == name) {
+			if field.Type() == val.Type() {
+				field.Set(val)
+			} else if val.Kind() == reflect.Interface && reflect.TypeOf(val.Interface()) == field.Type() {
+				field.Set(reflect.ValueOf(val.Interface()))
+			}
+			// Future: add type conversion (string to int, etc) if needed
+			break
+		}
+	}
 }
 
 // DispatchKey executes an action by keybinding.
