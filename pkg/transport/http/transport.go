@@ -114,7 +114,28 @@ func (t *Transport) Register(prototype core.Handler) {
 		resp, err := handler.Handle(req.Context())
 		if err != nil {
 			t.Logger.Error("Handler failed", "error", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			code := http.StatusInternalServerError
+			var resp any = map[string]string{"error": err.Error()}
+
+			// Check for optional interfaces
+			type StatusCoder interface {
+				StatusCode() int
+			}
+			type Payloader interface {
+				Payload() any
+			}
+
+			if sc, ok := err.(StatusCoder); ok {
+				code = sc.StatusCode()
+			}
+			if pl, ok := err.(Payloader); ok {
+				resp = pl.Payload()
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(code)
+			json.NewEncoder(w).Encode(resp)
 			return
 		}
 
