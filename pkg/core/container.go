@@ -19,7 +19,8 @@ func (c *Container) Provide(name string, instance any) {
 	c.providers[name] = instance
 }
 
-// Inject injects dependencies into a struct by matching field names.
+// Inject injects dependencies into a struct.
+// Looks for `inject:"ProviderName"` tags on pointer fields.
 func (c *Container) Inject(target any) {
 	val := reflect.ValueOf(target)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
@@ -37,7 +38,14 @@ func (c *Container) Inject(target any) {
 			continue
 		}
 
-		if dep, ok := c.providers[fieldType.Name]; ok {
+		// Check for inject tag first
+		injectName := fieldType.Tag.Get("inject")
+		if injectName == "" {
+			// Fallback to field name for backwards compatibility
+			injectName = fieldType.Name
+		}
+
+		if dep, ok := c.providers[injectName]; ok {
 			depVal := reflect.ValueOf(dep)
 			if depVal.Type().AssignableTo(fieldType.Type) {
 				fieldVal.Set(depVal)
