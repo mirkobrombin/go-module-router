@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/mirkobrombin/go-module-router/v2/pkg/core"
 	"github.com/mirkobrombin/go-module-router/v2/pkg/logger"
@@ -102,7 +103,8 @@ func (t *Transport) Register(prototype core.Handler) {
 		}
 
 		// Bind JSON body if present
-		if req.Body != nil {
+		contentType := req.Header.Get("Content-Type")
+		if req.Body != nil && strings.HasPrefix(contentType, "application/json") {
 			body, _ := io.ReadAll(req.Body)
 			if len(body) > 0 {
 				binder.BindJSON(instance, body)
@@ -111,7 +113,13 @@ func (t *Transport) Register(prototype core.Handler) {
 
 		// Execute
 		handler := instance.(core.Handler)
-		resp, err := handler.Handle(req.Context())
+
+		// Inject HTTP context
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, "http_request", req)
+		ctx = context.WithValue(ctx, "http_response_writer", w)
+
+		resp, err := handler.Handle(ctx)
 		if err != nil {
 			t.Logger.Error("Handler failed", "error", err)
 

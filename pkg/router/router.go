@@ -17,6 +17,12 @@ type Pattern = core.Pattern
 // Meta is an alias for Pattern (backward compatibility with HTTP examples)
 type Meta = core.Pattern
 
+// Context keys for HTTP access
+const (
+	CtxKeyRequest        = "http_request"
+	CtxKeyResponseWriter = "http_response_writer"
+)
+
 // HTTP creates a new HTTP transport.
 func HTTP() *http.Transport {
 	return http.New()
