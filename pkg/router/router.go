@@ -94,3 +94,8 @@ func (r *Router) Dispatch(ctx context.Context, action string, payload ...any) (a
 func (r *Router) DispatchKey(ctx context.Context, key string) (any, error) {
 	return r.Action.DispatchKey(ctx, key)
 }
+
+// Handlers returns all registered HTTP handlers (for Swagger generation).
+func (r *Router) Handlers() []Handler {
+	return r.HTTP.Handlers()
+}

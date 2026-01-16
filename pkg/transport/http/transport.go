@@ -20,6 +20,7 @@ type Transport struct {
 	Logger     logger.Logger
 	middleware []func(http.Handler) http.Handler
 	prefix     string
+	handlers   []core.Handler
 }
 
 // New creates a new HTTP transport.
@@ -55,6 +56,7 @@ func (t *Transport) Group(prefix string) *Transport {
 // Register adds an HTTP endpoint.
 // Reads `method:"GET"` and `path:"/users/{id}"` tags from Pattern field.
 func (t *Transport) Register(prototype core.Handler) {
+	t.handlers = append(t.handlers, prototype)
 	val := reflect.ValueOf(prototype)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		panic("Transport.Register: prototype must be a pointer to a struct")
@@ -183,4 +185,9 @@ func (t *Transport) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Mux returns the underlying ServeMux.
 func (t *Transport) Mux() *http.ServeMux {
 	return t.mux
+}
+
+// Handlers returns all registered handlers (for Swagger generation).
+func (t *Transport) Handlers() []core.Handler {
+	return t.handlers
 }
