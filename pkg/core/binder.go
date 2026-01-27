@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+
+	"github.com/mirkobrombin/go-foundation/pkg/tags"
 )
 
 // BindFunc is a function that extracts a value by key from a source.
@@ -29,46 +31,72 @@ func (b *Binder) AddSource(tag string, fn BindFunc) {
 
 // Bind populates struct fields from registered sources.
 func (b *Binder) Bind(target any) error {
-	v := reflect.ValueOf(target)
-	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
+	val := reflect.ValueOf(target)
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("target must be a pointer to a struct")
 	}
 
-	elem := v.Elem()
-	typ := elem.Type()
+	elem := val.Elem()
 
-	for i := 0; i < elem.NumField(); i++ {
-		field := elem.Field(i)
-		fieldType := typ.Field(i)
+	// Track which fields have been set to avoid overwriting with lower priority sources?
+	// Or just use the first value found (since sources loop order is random map iteration).
+	// To preserve original semantics: "Try each registered source... if valStr != '' break".
+	// The original implementation iterated fields, then iterated sources.
+	// We want to iterate sources (cached), then fields.
+	// This changes order: We iterate Source A -> all fields. Source B -> all fields.
+	// If Source A and B both set Field X, the last one wins.
+	// Original: For Field X, iterate sources (random order). First sets wins.
+	// Since original source order was random, "Last wins" in our new loop is equivalent to "First wins" in a reversed random order.
+	// So it is acceptable.
 
+	// Collect valuesmap[fieldIndex]value
+	values := make(map[int]string)
+
+	// 1. Process explicit sources
+	for tag, fn := range b.sources {
+		parser := tags.NewParser(tag)
+		fields := parser.ParseStruct(target)
+
+		for _, meta := range fields {
+			// Skip if already set? (First Wins strategy adaptation)
+			// If we want "First Scanned Source Wins", we check existence.
+			// Since source iteration is random, this is fine.
+			if _, ok := values[meta.Index]; ok {
+				continue
+			}
+
+			key := meta.RawTag
+			if key == "" {
+				continue
+			}
+
+			if val := fn(key); val != "" {
+				values[meta.Index] = val
+			}
+		}
+	}
+
+	// 2. Process defaults
+	// Only if not set by sources
+	defParser := tags.NewParser("default")
+	defFields := defParser.ParseStruct(target)
+	for _, meta := range defFields {
+		if _, ok := values[meta.Index]; !ok {
+			if meta.RawTag != "" {
+				values[meta.Index] = meta.RawTag
+			}
+		}
+	}
+
+	// 3. Apply values
+	for idx, val := range values {
+		field := elem.Field(idx)
 		if !field.CanSet() {
 			continue
 		}
-
-		// Try each registered source
-		var valStr string
-		for tag, fn := range b.sources {
-			if key, ok := fieldType.Tag.Lookup(tag); ok {
-				valStr = fn(key)
-				if valStr != "" {
-					break
-				}
-			}
-		}
-
-		// Check for default
-		if valStr == "" {
-			if def, ok := fieldType.Tag.Lookup("default"); ok {
-				valStr = def
-			}
-		}
-
-		if valStr == "" {
-			continue
-		}
-
-		if err := setField(field, valStr); err != nil {
-			return fmt.Errorf("failed to bind field %s: %w", fieldType.Name, err)
+		if err := setField(field, val); err != nil {
+			typeField := elem.Type().Field(idx)
+			return fmt.Errorf("failed to bind field %s: %w", typeField.Name, err)
 		}
 	}
 

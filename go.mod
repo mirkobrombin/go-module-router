@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/fasthttp/router v1.5.4
-	github.com/mirkobrombin/go-foundation v0.2.0
+	github.com/mirkobrombin/go-foundation v0.3.0
 	github.com/mirkobrombin/go-revert/v2 v2.0.0
 	github.com/mirkobrombin/go-signal/v2 v2.0.0
 	github.com/valyala/fasthttp v1.68.0
