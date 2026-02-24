@@ -23,8 +23,12 @@ type Transport struct {
 	middleware []func(http.Handler) http.Handler
 	prefix     string
 	handlers   []core.Handler
-	mu         sync.RWMutex
-	srv        *http.Server
+	lifecycle  *lifecycleState
+}
+
+type lifecycleState struct {
+	mu  sync.RWMutex
+	srv *http.Server
 }
 
 // New creates a new HTTP transport.
@@ -33,6 +37,7 @@ func New() *Transport {
 		mux:       http.NewServeMux(),
 		container: core.NewContainer(),
 		Logger:    logger.Nop,
+		lifecycle: &lifecycleState{},
 	}
 }
 
@@ -54,6 +59,7 @@ func (t *Transport) Group(prefix string) *Transport {
 		Logger:     t.Logger,
 		middleware: append([]func(http.Handler) http.Handler(nil), t.middleware...),
 		prefix:     t.prefix + prefix,
+		lifecycle:  t.lifecycle,
 	}
 }
 
@@ -175,21 +181,21 @@ func (t *Transport) Listen(addr string) error {
 	t.Logger.Info("HTTP transport listening", "addr", addr)
 	srv := &http.Server{Addr: addr, Handler: t.mux}
 
-	t.mu.Lock()
-	if t.srv != nil {
-		t.mu.Unlock()
+	t.lifecycle.mu.Lock()
+	if t.lifecycle.srv != nil {
+		t.lifecycle.mu.Unlock()
 		return fmt.Errorf("http transport already listening")
 	}
-	t.srv = srv
-	t.mu.Unlock()
+	t.lifecycle.srv = srv
+	t.lifecycle.mu.Unlock()
 
 	err := srv.ListenAndServe()
 
-	t.mu.Lock()
-	if t.srv == srv {
-		t.srv = nil
+	t.lifecycle.mu.Lock()
+	if t.lifecycle.srv == srv {
+		t.lifecycle.srv = nil
 	}
-	t.mu.Unlock()
+	t.lifecycle.mu.Unlock()
 
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
@@ -199,9 +205,9 @@ func (t *Transport) Listen(addr string) error {
 
 // Shutdown gracefully shuts down.
 func (t *Transport) Shutdown(ctx context.Context) error {
-	t.mu.RLock()
-	srv := t.srv
-	t.mu.RUnlock()
+	t.lifecycle.mu.RLock()
+	srv := t.lifecycle.srv
+	t.lifecycle.mu.RUnlock()
 	if srv == nil {
 		return nil
 	}
