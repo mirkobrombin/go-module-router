@@ -3,11 +3,13 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/mirkobrombin/go-module-router/v2/pkg/core"
 	"github.com/mirkobrombin/go-module-router/v2/pkg/logger"
@@ -21,6 +23,12 @@ type Transport struct {
 	middleware []func(http.Handler) http.Handler
 	prefix     string
 	handlers   []core.Handler
+	lifecycle  *lifecycleState
+}
+
+type lifecycleState struct {
+	mu  sync.RWMutex
+	srv *http.Server
 }
 
 // New creates a new HTTP transport.
@@ -29,6 +37,7 @@ func New() *Transport {
 		mux:       http.NewServeMux(),
 		container: core.NewContainer(),
 		Logger:    logger.Nop,
+		lifecycle: &lifecycleState{},
 	}
 }
 
@@ -50,6 +59,7 @@ func (t *Transport) Group(prefix string) *Transport {
 		Logger:     t.Logger,
 		middleware: append([]func(http.Handler) http.Handler(nil), t.middleware...),
 		prefix:     t.prefix + prefix,
+		lifecycle:  t.lifecycle,
 	}
 }
 
@@ -169,12 +179,61 @@ func (t *Transport) Register(prototype core.Handler) {
 // Listen starts the HTTP server.
 func (t *Transport) Listen(addr string) error {
 	t.Logger.Info("HTTP transport listening", "addr", addr)
-	return http.ListenAndServe(addr, t.mux)
+	srv := &http.Server{Addr: addr, Handler: t.mux}
+
+	t.lifecycle.mu.Lock()
+	if t.lifecycle.srv != nil {
+		t.lifecycle.mu.Unlock()
+		return fmt.Errorf("http transport already listening")
+	}
+	t.lifecycle.srv = srv
+	t.lifecycle.mu.Unlock()
+
+	err := srv.ListenAndServe()
+
+	t.lifecycle.mu.Lock()
+	if t.lifecycle.srv == srv {
+		t.lifecycle.srv = nil
+	}
+	t.lifecycle.mu.Unlock()
+
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
 // Shutdown gracefully shuts down.
 func (t *Transport) Shutdown(ctx context.Context) error {
+	t.lifecycle.mu.Lock()
+	srv := t.lifecycle.srv
+	if srv == nil {
+		t.lifecycle.mu.Unlock()
+		return nil
+	}
+	t.lifecycle.mu.Unlock()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	}
+
+	t.lifecycle.mu.Lock()
+	if t.lifecycle.srv == srv {
+		t.lifecycle.srv = nil
+	}
+	t.lifecycle.mu.Unlock()
+
 	return nil
+}
+
+// IsRunning returns true if the server is listening.
+func (t *Transport) IsRunning() bool {
+	t.lifecycle.mu.RLock()
+	defer t.lifecycle.mu.RUnlock()
+	return t.lifecycle.srv != nil
 }
 
 // ServeHTTP implements http.Handler.
