@@ -3,11 +3,13 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/mirkobrombin/go-module-router/v2/pkg/core"
 	"github.com/mirkobrombin/go-module-router/v2/pkg/logger"
@@ -21,6 +23,8 @@ type Transport struct {
 	middleware []func(http.Handler) http.Handler
 	prefix     string
 	handlers   []core.Handler
+	mu         sync.RWMutex
+	srv        *http.Server
 }
 
 // New creates a new HTTP transport.
@@ -169,11 +173,42 @@ func (t *Transport) Register(prototype core.Handler) {
 // Listen starts the HTTP server.
 func (t *Transport) Listen(addr string) error {
 	t.Logger.Info("HTTP transport listening", "addr", addr)
-	return http.ListenAndServe(addr, t.mux)
+	srv := &http.Server{Addr: addr, Handler: t.mux}
+
+	t.mu.Lock()
+	if t.srv != nil {
+		t.mu.Unlock()
+		return fmt.Errorf("http transport already listening")
+	}
+	t.srv = srv
+	t.mu.Unlock()
+
+	err := srv.ListenAndServe()
+
+	t.mu.Lock()
+	if t.srv == srv {
+		t.srv = nil
+	}
+	t.mu.Unlock()
+
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
 // Shutdown gracefully shuts down.
 func (t *Transport) Shutdown(ctx context.Context) error {
+	t.mu.RLock()
+	srv := t.srv
+	t.mu.RUnlock()
+	if srv == nil {
+		return nil
+	}
+
+	if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
 	return nil
 }
 
